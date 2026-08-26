@@ -1,0 +1,110 @@
+global:
+  imageRegistry: "463200133372.dkr.ecr.us-east-1.amazonaws.com"
+  imagePullPolicy: IfNotPresent
+  dbHost: "myproject-test-appdb2.c83qwwwomrnv.us-east-1.rds.amazonaws.com"
+  dbPort: "3306"
+  dbSecretName: "myproject-test-database-credentials-v2"
+
+services:
+  auth-service:
+    enabled: true
+    namespace: "auth-ns"
+    port: 8081
+    imageName: "test-auth-service"
+    dbName: "appdb2"
+    serviceType: "ClusterIP"
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "500m", memory: "1Gi" }
+
+  gateway-service:
+    enabled: true
+    namespace: "gateway-ns"
+    port: 8080
+    imageName: "test-gateway-service"
+    dbName: "" # Gateway might not require a database connection
+    serviceType: "LoadBalancer"
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "500m", memory: "1Gi" }
+    env:
+      - name: AUTH_SERVICE_URL
+        value: "http://auth-service.auth-ns.svc.cluster.local:8081"
+      - name: USER_SERVICE_URL
+        value: "http://user-service.user-ns.svc.cluster.local:8082"
+      - name: ADMIN_SERVICE_URL
+        value: "http://admin-service.admin-ns.svc.cluster.local:8083"
+      - name: CUSTOMER_SERVICE_URL
+        value: "http://customer-service.customer-ns.svc.cluster.local:8084"
+      - name: EMPLOYEE_SERVICE_URL
+        value: "http://employee-service.employee-ns.svc.cluster.local:8085"
+      - name: HR_SERVICE_URL
+        value: "http://hr-service.hr-ns.svc.cluster.local:8086"
+      - name: TASK_SERVICE_URL
+        value: "http://task-service.task-ns.svc.cluster.local:8087"
+
+  user-service:
+    enabled: true
+    namespace: "user-ns"
+    port: 8082
+    imageName: "test-user-service"
+    dbName: "appdb2"
+    serviceType: "ClusterIP"
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "500m", memory: "1Gi" }
+
+  admin-service:
+    enabled: true
+    namespace: "admin-ns"
+    port: 8083
+    imageName: "test-admin-service"
+    dbName: "appdb2"
+    serviceType: "ClusterIP"
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "500m", memory: "1Gi" }
+
+  employee-service:
+    enabled: true
+    namespace: "employee-ns"
+    port: 8085
+    imageName: "test-employee-service"
+    dbName: "appdb2"
+    serviceType: "ClusterIP"
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "500m", memory: "1Gi" }
+
+  customer-service:
+    enabled: true
+    namespace: "customer-ns"
+    port: 8084
+    imageName: "test-customer-service"
+    dbName: "appdb2"
+    serviceType: "ClusterIP"
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "500m", memory: "1Gi" }
+
+  hr-service:
+    enabled: true
+    namespace: "hr-ns"
+    port: 8086
+    imageName: "test-hr-service"
+    dbName: "appdb2"
+    serviceType: "ClusterIP"
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "500m", memory: "1Gi" }
+
+  task-service:
+    enabled: true
+    namespace: "task-ns"
+    port: 8087
+    imageName: "test-task-service"
+    dbName: "appdb2"
+    serviceType: "ClusterIP"
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "500m", memory: "1Gi" }

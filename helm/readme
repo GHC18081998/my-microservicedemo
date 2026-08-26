@@ -1,0 +1,81 @@
+first in terraform instance update all 8 services in terraform.tfvars in ecr repository configuration
+
+now in deployment instance clone the code i.e. microservices. install helm docker eksctl kubectl
+
+go to ecr service and by using push command push the docker immage to respected repositories
+
+then create helm folder in microservicesdemo folder, before creating yaml file create namespaces. create the yaml files here only
+
+
+
+creating namespace command:
+        kubectl apply -f <namespace name.yaml>
+
+
+
+commands after finishing the yaml files: 
+
+Once these files are saved in your workspace, you can install or upgrade all 8 microservices with a single command from your project root:
+		helm upgrade --install crm-app ./microservice  ----- user should be in location /root/microservicedemo/helm
+
+Check the Pods:
+Once the Helm command succeeds, it will deploy all 8 microservices across their respective namespaces in one shot! You can watch them all spin up at once with this command:
+		kubectl get pods -A | grep -E 'auth|gateway|user|admin|employee|customer|hr|task'
+
+
+Check the Services:
+		kubectl get svc -A | grep -E 'auth|gateway|user|admin|employee|customer|hr|task'
+		
+Verify the new Gateway pod is ready
+		kubectl get pods -n gateway-ns
+		
+		
+Check the Kubernetes Events:
+		kubectl describe pod -l app=admin-service -n admin-ns
+		kubectl describe pod -l app=gateway-service -n gateway-ns | grep -A 10 "Environment:"
+		
+Check the Application Logs:
+		kubectl logs -l app=admin-service -n admin-ns
+		kubectl logs -l app=auth-service -n auth-ns
+		kubectl logs -l app=gateway-service -n gateway-ns --tail=50
+		
+Get Your Public URL (The External Entryway)
+		kubectl get svc gateway-service -n gateway-ns
+
+
+Run a simple Health Check (The Safest Test)
+  Before guessing your specific API routes, let's ask the Gateway if it is healthy.
+  Run this curl command right from your Linux terminal (replace the URL with your exact AWS link):
+		curl -X GET http://ad2790679807b48719913730a48f9173-499939766.us-east-1.elb.amazonaws.com:8080/actuator/health
+		
+		
+		
+Test a Routed Microservice (e.g., Auth Service)
+  The entire job of an API Gateway is to take external requests and route them to your internal ClusterIP services (like auth-service or user-service).
+  Depending on how your developers wrote the routing rules in the Gateway code, you usually just append the service name or route path to the end of the URL.
+
+If you have an Auth Login endpoint:
+		curl -X POST http://ad2790679807b48719913730a48f9173-499939766.us-east-1.elb.amazonaws.com:8080/api/auth/login \
+		-H "Content-Type: application/json" \
+		-d '{"username": "dbadmin", "password": "dbpassword123"}'
+		
+		
+		
+		
+Creating Secrets:
+Create a secret from literal values (username/password):
+		kubectl create secret generic my-secret \
+		  --from-literal=username=admin \
+		  --from-literal=password=secret123 \
+          -n <my-namespace like gateway-ns>
+
+
+Viewing & Inspecting Secrets:
+List all secrets in a namespace:
+		kubectl get secrets -n <my-namespace>
+		
+Describe a secret (Shows keys stored inside, but not the actual secret values):
+		kubectl describe secret my-secret -n <my-namespace>
+		
+To view all secrets across every single namespace in your cluster at once:
+		kubectl get secrets --all-namespaces

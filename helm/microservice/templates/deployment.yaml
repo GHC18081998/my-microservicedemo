@@ -1,0 +1,72 @@
+{{- range $name, $svc := .Values.services }}
+{{- if $svc.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $svc.namespace }}
+  labels:
+    app: {{ $name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+    spec:
+      containers:
+      - name: {{ $name }}
+        image: "{{ $.Values.global.imageRegistry }}/{{ $svc.imageName }}:latest"
+        imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+        resources:
+          requests:
+            cpu: "{{ $svc.resources.requests.cpu }}"
+            memory: "{{ $svc.resources.requests.memory }}"
+          limits:
+            cpu: "{{ $svc.resources.limits.cpu }}"
+            memory: "{{ $svc.resources.limits.memory }}"
+        ports:
+        - containerPort: {{ $svc.port }}
+          name: http
+        env:
+        - name: PORT
+          value: "{{ $svc.port }}"
+        {{- if $svc.dbName }}
+        - name: DB_HOST
+          value: "{{ $.Values.global.dbHost }}"
+        - name: DB_PORT
+          value: "{{ $.Values.global.dbPort }}"
+        - name: DB_NAME
+          value: "{{ $svc.dbName }}"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.global.dbSecretName }}
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.global.dbSecretName }}
+              key: password
+        {{- end }}
+        {{- if $svc.env }}
+{{ toYaml $svc.env | indent 8 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: {{ $svc.port }}
+          initialDelaySeconds: 40
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: {{ $svc.port }}
+          initialDelaySeconds: 40
+          periodSeconds: 10
+{{- end }}
+{{- end }}
