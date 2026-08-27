@@ -23,7 +23,7 @@ services:
     port: 8080
     imageName: "test-gateway-service"
     dbName: "" # Gateway might not require a database connection
-    serviceType: "LoadBalancer"
+    serviceType: "ClusterIP"
     resources:
       requests: { cpu: "250m", memory: "512Mi" }
       limits: { cpu: "500m", memory: "1Gi" }
