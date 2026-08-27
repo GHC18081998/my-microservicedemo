@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: crm-alb-ingress
+  namespace: gateway-ns
+  annotations:
+    # Tells AWS to make this ALB accessible from the public internet
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Routes traffic directly to the pod IPs (Highly efficient for EKS)
+    alb.ingress.kubernetes.io/target-type: ip
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: 8080
