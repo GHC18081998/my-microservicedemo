@@ -1,9 +1,9 @@
 global:
-  imageRegistry: "463200133372.dkr.ecr.us-east-1.amazonaws.com"
+  imageRegistry: "390034075362.dkr.ecr.us-east-2.amazonaws.com"
   imagePullPolicy: IfNotPresent
-  dbHost: "myproject-test-appdb2.c83qwwwomrnv.us-east-1.rds.amazonaws.com"
+  dbHost: "myproject-staging-appdb2.cvy2g42o2453.us-east-2.rds.amazonaws.com"
   dbPort: "3306"
-  dbSecretName: "myproject-test-database-credentials-v2"
+  dbSecretName: "rds!db-2a6aef20-1979-4b99-9747-b3fce82b032d"
 
 services:
   auth-service:
