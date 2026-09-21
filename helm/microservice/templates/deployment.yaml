@@ -24,8 +24,11 @@ spec:
         {{- if eq $service.registry "nexus" }}
         image: "{{ $.Values.nexus.repository }}/{{ $service.name }}:{{ $service.imageTag }}"
         {{- else }}
-        image: "{{ $.Values.imageRegistry }}/{{ $svc.imageName }}:latest"
-        imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+        image: "{{ $.Values.image.repository }}:{{ $service.imageTag }}"
+        {{- end }}
+        
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        
         resources:
           requests:
             cpu: "{{ $svc.resources.requests.cpu }}"
@@ -41,21 +44,37 @@ spec:
           value: "{{ $svc.port }}"
         {{- if $svc.dbName }}
         - name: DB_HOST
-          value: "{{ $.Values.global.dbHost }}"
+          value: {{ $.Values.database.host | quote }}
         - name: DB_PORT
-          value: "{{ $.Values.global.dbPort }}"
+          value: {{ $.Values.database.host | quote }}
         - name: DB_NAME
-          value: "{{ $svc.dbName }}"
+          value: {{ $.Values.database.host | quote }}
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: {{ $.Values.global.dbSecretName }}
+              name: {{ $.Values.database.secretName }}
               key: username
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ $.Values.global.dbSecretName }}
+              name: {{ $.Values.database.secretName }}
               key: password
+
+        - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://{{ $.Values.database.host }}:{{ $.Values.database.port }}/{{ $.Values.database.name }}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.secretName }}
+                  key: username
+
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.secretName }}
+                  key: password
+
         {{- end }}
         {{- if $svc.env }}
 {{ toYaml $svc.env | indent 8 }}
