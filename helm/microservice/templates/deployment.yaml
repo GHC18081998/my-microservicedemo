@@ -20,7 +20,11 @@ spec:
     spec:
       containers:
       - name: {{ $name }}
-        image: "{{ $.Values.global.imageRegistry }}/{{ $svc.imageName }}:latest"
+
+        {{- if eq $service.registry "nexus" }}
+        image: "{{ $.Values.nexus.repository }}/{{ $service.name }}:{{ $service.imageTag }}"
+        {{- else }}
+        image: "{{ $.Values.imageRegistry }}/{{ $svc.imageName }}:latest"
         imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
         resources:
           requests:
