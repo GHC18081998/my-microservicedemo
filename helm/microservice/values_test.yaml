@@ -1,0 +1,13 @@
+namespace: microservices-staging-ns
+
+replicaCount: 1
+
+image:
+  repository: 390034075362.dkr.ecr.us-east-2.amazonaws.com/staging-gateway-service
+  pullPolicy: IfNotPresent
+
+database:
+  host: myproject-staging-appdb2.cvy2g42o2453.us-east-2.rds.amazonaws.com
+  port: "3306"
+  name: microservice
+  secretName: myproject-staging-rds-credentials
