@@ -21,10 +21,10 @@ spec:
       containers:
       - name: {{ $name }}
 
-        {{- if eq $service.registry "nexus" }}
-        image: "{{ $.Values.nexus.repository }}/{{ $service.name }}:{{ $service.imageTag }}"
+        {{- if eq $svc.registry "nexus" }}
+        image: "{{ $.Values.nexus.repository }}/{{ $name }}:{{ $svc.imageTag }}"
         {{- else }}
-        image: "{{ $.Values.image.repository }}:{{ $service.imageTag }}"
+        image: "{{ $.Values.image.repository }}:{{ $svc.imageTag }}"
         {{- end }}
         
         imagePullPolicy: {{ $.Values.image.pullPolicy }}
@@ -46,9 +46,9 @@ spec:
         - name: DB_HOST
           value: {{ $.Values.database.host | quote }}
         - name: DB_PORT
-          value: {{ $.Values.database.host | quote }}
+          value: {{ $.Values.database.port | quote }}
         - name: DB_NAME
-          value: {{ $.Values.database.host | quote }}
+          value: {{ $svc.dbName | quote }}
         - name: DB_USER
           valueFrom:
             secretKeyRef:
@@ -61,20 +61,19 @@ spec:
               key: password
 
         - name: SPRING_DATASOURCE_URL
-              value: "jdbc:mysql://{{ $.Values.database.host }}:{{ $.Values.database.port }}/{{ $.Values.database.name }}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+          value: "jdbc:mysql://{{ $.Values.database.host }}:{{ $.Values.database.port }}/{{ $svc.dbName }}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
 
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $.Values.database.secretName }}
-                  key: username
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.database.secretName }}
+              key: username
 
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $.Values.database.secretName }}
-                  key: password
-
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.database.secretName }}
+              key: password
         {{- end }}
         {{- if $svc.env }}
 {{ toYaml $svc.env | indent 8 }}
