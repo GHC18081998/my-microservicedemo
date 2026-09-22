@@ -86,7 +86,7 @@ pipeline {
                 // -e prints full stack traces on failure
                 sh 'mvn -B -V -e -N install'
                 dir('common-library') {
-                    sh 'mvn -B -E clean install -DskipTests'
+                    sh 'mvn -B -e clean install -DskipTests'
                 }
             }
         }
