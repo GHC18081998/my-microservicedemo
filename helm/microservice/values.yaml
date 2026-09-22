@@ -14,3 +14,8 @@ database:
 
 nexus:
   repository: 10.0.10.22:8082/microservices-docker
+
+services:
+  auth-service:
+    enabled: true
+    namespace: "auth-ns"
