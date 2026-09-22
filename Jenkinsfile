@@ -212,28 +212,26 @@ pipeline {
         }
 
         stage('Helm Deploy') {
-            // when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
             steps {
                 script {
-                    env.CHANGED_SERVICES.split(',').each { service ->
-                        // Extracts short name for helm values mapping (e.g., 'auth-service' -> 'auth')
+                    def changedList = env.CHANGED_SERVICES.split(',')
+                    def setArgs = changedList.collect { service ->
                         def helmServiceKey = service.replace('-service', '')
-                        retry(5) {
-                            sh """
-                                export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
-                                sleep \$((RANDOM % 15))
-                                helm upgrade ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} --reuse-values -f ${HELM_VALUES} \\
-                                    --set services.${helmServiceKey}.image=staging-${service} \\
-                                    --set services.${helmServiceKey}.tag=${IMAGE_TAG}
-                            """
-                        }
+                        return "--set services.${helmServiceKey}.image=staging-${service} --set services.${helmServiceKey}.tag=${IMAGE_TAG}"
+                    }.join(' ')
+
+                    retry(5) {
+                        sh """
+                            export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
+                            sleep \$((RANDOM % 15))
+                            helm upgrade ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} --reuse-values -f ${HELM_VALUES} ${setArgs}
+                        """
                     }
                 }
             }
         }
 
         stage('Rollout Status') {
-            // when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
             steps {
                 script {
                     env.CHANGED_SERVICES.split(',').each { service ->
@@ -247,7 +245,6 @@ pipeline {
         }
 
         stage('Smoke Test') {
-            // when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
             steps {
                 script {
                     def ports = ['auth-service': 8081, 'gateway-service': 8080, 'user-service': 8082,
@@ -267,8 +264,7 @@ pipeline {
                 }
             }
         }
-    }
-
+        
     post {
         always {
             cleanWs()
