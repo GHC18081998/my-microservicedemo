@@ -26,7 +26,7 @@ pipeline {
         HELM_VALUES      = 'helm/microservice/values.yaml'
         HELM_TEST_VALUES = 'helm/microservice/values_test.yaml'
 
-        ENABLE_DEPLOY = 'true'
+        ENABLE_DEPLOY    = 'true'
     }
 
     stages {
@@ -35,15 +35,13 @@ pipeline {
                 checkout scm
                 
                 script {
-                    // Unified list of ALL 8 services
-                    def allServices = [
-                        'gateway-service', 'auth-service', 'user-service', 
-                        'admin-service', 'employee-service', 'customer-service', 
-                        'hr-service', 'task-service'
-                    ]
+                    // Define which services go where based on your architecture
+                    def ecrList = ['gateway-service', 'auth-service']
+                    def nexusList = ['user-service', 'admin-service', 'employee-service', 'customer-service', 'hr-service', 'task-service']
+                    def allServices = ecrList + nexusList
 
-                    // FIXED: diff-tree works reliably even on Jenkins shallow clones
-                    def changedFiles = sh(script: "git diff-tree --no-commit-id --name-only -r HEAD || echo ''", returnStdout: true).trim().split('\n')
+                    // Detect which services changed in this commit
+                    def changedFiles = sh(script: "git diff --name-only HEAD~1 HEAD || echo ''", returnStdout: true).trim().split('\n')
                     
                     def changed = allServices.findAll { service ->
                         changedFiles.any { it.startsWith(service + '/') }
@@ -64,6 +62,7 @@ pipeline {
         stage('Global Build & Quality Gate') {
             when { expression { env.CHANGED_SERVICES != '' } }
             steps {
+                // Run one global Maven build so SonarQube has all compiled binaries
                 sh 'mvn clean verify'
 
                 withSonarQubeEnv('sonarqube') {
@@ -82,6 +81,7 @@ pipeline {
         stage('Prepare Cluster & Trivy Cache') {
             when { expression { env.CHANGED_SERVICES != '' } }
             steps {
+                // Update Kubeconfig once globally to avoid throttling in parallel steps
                 sh "aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}"
                 
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
@@ -96,6 +96,7 @@ pipeline {
                     '''
                 }
 
+                // Pre-download Trivy DB to prevent disk crashes during parallel scans
                 sh '''
                     export TMPDIR=/var/lib/jenkins/trivy-cache-shared
                     mkdir -p /var/lib/jenkins/trivy-cache-shared
@@ -105,31 +106,43 @@ pipeline {
             }
         }
 
-        stage('Parallel Build, Scan & Deploy') {
+        stage('Parallel Build, Scan & Push') {
             when { expression { env.CHANGED_SERVICES != '' } }
             steps {
                 script {
+                    def ecrList = ['gateway-service', 'auth-service']
                     def services = env.CHANGED_SERVICES.split(',')
                     def parallelTasks = [:]
 
+                    // Pre-calculate ALL Helm arguments safely BEFORE the loop starts
+                    def helmArgs = ""
+                    services.each { s ->
+                        if (!s) return
+                        def sKey = s.replace('-service', '')
+                        helmArgs += " --set services.${sKey}.imageTag=${s}-${BUILD_NUMBER}"
+                    }
+                    env.HELM_SET_ARGS = helmArgs
+
+                    // Define parallel tasks
                     services.each { service ->
                         if (!service) return
 
-                        parallelTasks["Process ${service}"] = {
-                            def imageTag = "${service}-${BUILD_NUMBER}"
-                            
-                            // Define BOTH endpoints for every service
-                            def ecrUri = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${imageTag}"
-                            def nexusUri = "${NEXUS_REGISTRY}/${NEXUS_REPOSITORY}/${service}:${imageTag}"
+                        // CRITICAL FIX: Bind variable locally to avoid Groovy closure scoping bug
+                        def localService = service
 
-                            stage("${service}: Docker Build") {
-                                // Apply BOTH tags simultaneously during the build phase
-                                sh "docker build -f ${service}/Dockerfile -t ${ecrUri} -t ${nexusUri} ."
+                        parallelTasks["Process ${localService}"] = {
+                            def imageTag = "${localService}-${BUILD_NUMBER}"
+                            def isEcr = ecrList.contains(localService)
+                            def imageUri = isEcr 
+                                ? "${ECR_REGISTRY}/${ECR_REPOSITORY}:${imageTag}" 
+                                : "${NEXUS_REGISTRY}/${NEXUS_REPOSITORY}/${localService}:${imageTag}"
+
+                            stage("${localService}: Docker Build") {
+                                sh "docker build -f ${localService}/Dockerfile -t ${imageUri} ."
                             }
 
-                            stage("${service}: Trivy Scan") {
+                            stage("${localService}: Trivy Scan") {
                                 retry(3) {
-                                    // Scan the local image via the ECR tag
                                     sh """
                                         export TMPDIR=/var/lib/jenkins/trivy-cache-shared
                                         trivy image --cache-dir /var/lib/jenkins/trivy-cache-shared \
@@ -137,66 +150,75 @@ pipeline {
                                           --severity HIGH,CRITICAL \
                                           --ignore-unfixed \
                                           --exit-code 0 \
-                                          ${ecrUri}
+                                          ${imageUri}
                                     """
                                 }
                             }
 
-                            stage("${service}: Push Image to ECR & Nexus") {
-                                // Push to ECR
-                                sh """
-                                    aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
-                                    docker push ${ecrUri}
-                                """
-                                
-                                // Push to Nexus
-                                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                            stage("${localService}: Push Image") {
+                                if (isEcr) {
                                     sh """
-                                        echo "\$NEXUS_PASS" | docker login ${NEXUS_REGISTRY} --username "\$NEXUS_USER" --password-stdin
-                                        docker push ${nexusUri}
+                                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                                        docker push ${imageUri}
                                     """
-                                }
-                            }
-
-                            stage("${service}: Helm Deploy") {
-                                if (env.ENABLE_DEPLOY == 'true') {
-                                    // Requires the Lockable Resources Jenkins Plugin
-                                    lock('helm-deploy-lock') {
-                                        def serviceKey = service.replace('-service', '')
-                                        // Removed --reuse-values to prevent initial installation crashes
+                                } else {
+                                    withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                                         sh """
-                                            helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} \
-                                              --namespace ${K8S_NAMESPACE} \
-                                              -f ${HELM_VALUES} \
-                                              -f ${HELM_TEST_VALUES} \
-                                              --set services.${serviceKey}.imageTag=${imageTag} \
-                                              --atomic --wait --timeout 10m
+                                            echo "\$NEXUS_PASS" | docker login ${NEXUS_REGISTRY} --username "\$NEXUS_USER" --password-stdin
+                                            docker push ${imageUri}
                                         """
                                     }
                                 }
                             }
-
-                            stage("${service}: Rollout & Smoke Test") {
-                                if (env.ENABLE_DEPLOY == 'true') {
-                                    def portMap = [
-                                        'auth-service': 8081, 'gateway-service': 8080, 'user-service': 8082,
-                                        'admin-service': 8082, 'employee-service': 8083, 'customer-service': 8084,
-                                        'hr-service': 8085, 'task-service': 8089
-                                    ]
-                                    def port = portMap[service]
-
-                                    sh """
-                                        kubectl rollout status deployment/${service} -n ${K8S_NAMESPACE} --timeout=300s
-                                        kubectl run smoke-test-${service}-${BUILD_NUMBER} --rm -i --restart=Never \
-                                          --image=curlimages/curl \
-                                          --namespace ${K8S_NAMESPACE} \
-                                          -- curl -sf http://${service}.${K8S_NAMESPACE}.svc.cluster.local:${port}/actuator/health
-                                    """
-                                }
-                            }
                         }
                     }
+                    
+                    // Execute the parallel builds
                     parallel parallelTasks
+                }
+            }
+        }
+
+        stage('Unified Helm Deploy') {
+            when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
+            steps {
+                script {
+                    // Deploy ALL changed services atomically in a single execution
+                    sh """
+                        helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} \
+                          --namespace ${K8S_NAMESPACE} \
+                          -f ${HELM_VALUES} \
+                          -f ${HELM_TEST_VALUES} \
+                          ${env.HELM_SET_ARGS} \
+                          --atomic --wait --timeout 10m
+                    """
+                }
+            }
+        }
+
+        stage('Rollout Status & Smoke Tests') {
+            when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
+            steps {
+                script {
+                    def portMap = [
+                        'auth-service': 8081, 'gateway-service': 8080, 'user-service': 8082,
+                        'admin-service': 8082, 'employee-service': 8083, 'customer-service': 8084,
+                        'hr-service': 8085, 'task-service': 8089
+                    ]
+                    
+                    def services = env.CHANGED_SERVICES.split(',')
+                    for (String svc : services) {
+                        if (!svc) continue
+                        def port = portMap[svc]
+                        
+                        sh """
+                            kubectl rollout status deployment/${svc} -n ${K8S_NAMESPACE} --timeout=300s
+                            kubectl run smoke-test-${svc}-${BUILD_NUMBER} --rm -i --restart=Never \
+                              --image=curlimages/curl \
+                              --namespace ${K8S_NAMESPACE} \
+                              -- curl -sf http://${svc}.${K8S_NAMESPACE}.svc.cluster.local:${port}/actuator/health
+                        """
+                    }
                 }
             }
         }
@@ -209,6 +231,12 @@ pipeline {
                 docker logout ${NEXUS_REGISTRY} >/dev/null 2>&1 || true
             '''
             cleanWs()
+        }
+        success {
+            echo "Pipeline succeeded! Changed services dynamically processed: ${env.CHANGED_SERVICES}"
+        }
+        failure {
+            echo "Pipeline failed. Check the logs to identify the broken stage."
         }
     }
 }
