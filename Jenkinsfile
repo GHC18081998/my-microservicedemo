@@ -270,10 +270,14 @@ pipeline {
                         
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
-                            sleep 10
+                            # Allow Kubernetes time to stabilize networking
+                            sleep 15
+                            
+                            # Use curl --retry to wait up to 45 seconds for the app to finish booting
                             kubectl run smoke-test-${service}-${BUILD_NUMBER} --rm -i --restart=Never -n ${targetNamespace} \\
                                 --image=curlimages/curl \\
-                                -- curl -sf http://${service}.${targetNamespace}.svc.cluster.local:${port}/actuator/health
+                                -- curl -sf --retry 10 --retry-delay 5 --retry-connrefused \\
+                                http://${service}.${targetNamespace}.svc.cluster.local:${port}/actuator/health
                         """
                     }
                 }
