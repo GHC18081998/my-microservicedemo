@@ -56,15 +56,9 @@ spec:
         - name: SPRING_DATASOURCE_URL
           value: "jdbc:mysql://{{ $.Values.database.host }}:{{ $.Values.database.port }}/{{ $svc.dbName }}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
         - name: SPRING_DATASOURCE_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: {{ $.Values.database.secretName }}
-              key: username
+          value: "$(DB_USER)"
         - name: SPRING_DATASOURCE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: {{ $.Values.database.secretName }}
-              key: password
+          value: "$(DB_PASSWORD)"
         {{- end }}
         {{- if $svc.env }}
 {{ toYaml $svc.env | indent 8 }}
