@@ -68,9 +68,10 @@ pipeline {
                         changedFiles.any { it.startsWith(service + '/') }
                     }.join(',')
 
+                    // Fallback to building/deploying all services if no specific change is detected
                     if (env.CHANGED_SERVICES == '') {
-                        echo 'No microservice changes detected. Skipping build.'
-                        currentBuild.result = 'SUCCESS'
+                        echo 'No microservice changes detected. Running full deployment for all services.'
+                        env.CHANGED_SERVICES = allServices.join(',')
                     } else {
                         echo "Changed services: ${env.CHANGED_SERVICES}"
                     }
