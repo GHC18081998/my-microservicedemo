@@ -238,6 +238,23 @@ pipeline {
             }
         }
 
+        stage('Rollout Status') {
+            steps {
+                script {
+                    env.CHANGED_SERVICES.split(',').each { service ->
+                        // Dynamically determine the namespace (e.g., 'auth-service' -> 'auth-ns')
+                        def targetNamespace = service.replace('-service', '') + '-ns'
+                        
+                        sh """
+                            export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
+                            echo "Waiting for ${service} to become ready in namespace ${targetNamespace}..."
+                            kubectl rollout status deployment/${service} -n ${targetNamespace} --timeout=300s
+                        """
+                    }
+                }
+            }
+        }
+
         stage('Smoke Test') {
             steps {
                 script {
@@ -260,7 +277,6 @@ pipeline {
                 }
             }
         }
-    }
         
     post {
         always {
