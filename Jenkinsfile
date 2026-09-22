@@ -264,6 +264,7 @@ pipeline {
                 }
             }
         }
+    }
         
     post {
         always {
