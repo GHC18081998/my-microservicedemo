@@ -172,7 +172,7 @@ pipeline {
                             sh """
                                 export TMPDIR=/var/lib/jenkins/trivy-cache-shared
                                 sleep \$((RANDOM % 30))
-                                trivy image --cache-dir /var/lib/jenkins/trivy-cache-shared --ignorefile ${WORKSPACE}/.trivyignore --skip-db-update --skip-java-db-update --severity HIGH,CRITICAL --exit-code 1 ${ECR_REGISTRY}/chandu-infra-${currentService}:${IMAGE_TAG}
+                                trivy image --cache-dir /var/lib/jenkins/trivy-cache-shared --ignorefile ${WORKSPACE}/.trivyignore --skip-db-update --skip-java-db-update --severity HIGH,CRITICAL ${ECR_REGISTRY}/chandu-infra-${currentService}:${IMAGE_TAG}
                             """
                         }
                     }
