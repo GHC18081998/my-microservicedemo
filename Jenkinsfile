@@ -213,6 +213,7 @@ pipeline {
         }
 
         stage('Helm Deploy') {
+            // when { expression { env.ENABLE_DEPLOY == 'true' } }
             steps {
                 script {
                     def changedList = env.CHANGED_SERVICES.split(',')
@@ -220,13 +221,17 @@ pipeline {
                         def helmServiceKey = service.replace('-service', '')
                         return "--set services.${helmServiceKey}.image=staging-${service} --set services.${helmServiceKey}.tag=${IMAGE_TAG}"
                     }.join(' ')
-        
+
                     retry(5) {
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
+                            
+                            # Automatically create the namespace if it does not exist
+                            kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                            
                             sleep \$((RANDOM % 15))
-                            helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} --reuse-values -f ${HELM_VALUES} ${setArgs} || \
-                            helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} -f ${HELM_VALUES} ${setArgs}
+                            helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} --create-namespace --reuse-values -f ${HELM_VALUES} ${setArgs} || \
+                            helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} --create-namespace -f ${HELM_VALUES} ${setArgs}
                         """
                     }
                 }
