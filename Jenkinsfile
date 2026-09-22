@@ -79,7 +79,7 @@ pipeline {
         }
 
         stage('Build Parent POM and Common Library') {
-            when { expression { env.CHANGED_SERVICES != '' } }
+            // when { expression { env.CHANGED_SERVICES != '' } }
             steps {
                 // -B runs in batch mode (no progress bars filling the logs)
                 // -V prints the Maven version for debugging
@@ -92,7 +92,7 @@ pipeline {
         }
 
         stage('Pre-download Trivy Databases') {
-            when { expression { env.CHANGED_SERVICES != '' } }
+            // when { expression { env.CHANGED_SERVICES != '' } }
             steps {
                 sh '''
                     export TMPDIR=/var/lib/jenkins/trivy-cache-shared
@@ -104,7 +104,7 @@ pipeline {
         }
 
         stage('Build') {
-            when { expression { env.CHANGED_SERVICES != '' } }
+            // when { expression { env.CHANGED_SERVICES != '' } }
             steps {
                 script {
                     env.CHANGED_SERVICES.split(',').each { service ->
@@ -117,7 +117,7 @@ pipeline {
         }
 
         stage('Test') {
-            when { expression { env.CHANGED_SERVICES != '' } }
+            // when { expression { env.CHANGED_SERVICES != '' } }
             steps {
                 script {
                     env.CHANGED_SERVICES.split(',').each { service ->
@@ -130,7 +130,7 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            when { expression { env.CHANGED_SERVICES != '' } }
+            // when { expression { env.CHANGED_SERVICES != '' } }
             steps {
                 script {
                     env.CHANGED_SERVICES.split(',').each { service ->
@@ -206,14 +206,14 @@ pipeline {
         }
         
         stage('EKS Authentication') {
-            when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
+            // when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
             steps {
                 sh "aws eks update-kubeconfig --name ${EKS_CLUSTER_NAME} --region ${AWS_REGION} --kubeconfig /tmp/kubeconfig-pipeline-${BUILD_NUMBER}"
             }
         }
 
         stage('Helm Deploy') {
-            when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
+            // when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
             steps {
                 script {
                     env.CHANGED_SERVICES.split(',').each { service ->
@@ -234,7 +234,7 @@ pipeline {
         }
 
         stage('Rollout Status') {
-            when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
+            // when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
             steps {
                 script {
                     env.CHANGED_SERVICES.split(',').each { service ->
@@ -248,7 +248,7 @@ pipeline {
         }
 
         stage('Smoke Test') {
-            when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
+            // when { expression { env.CHANGED_SERVICES != '' && env.ENABLE_DEPLOY == 'true' } }
             steps {
                 script {
                     def ports = ['auth-service': 8081, 'gateway-service': 8080, 'user-service': 8082,
