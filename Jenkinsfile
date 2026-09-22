@@ -217,7 +217,7 @@ pipeline {
                 script {
                     def changedList = env.CHANGED_SERVICES.split(',')
                     def setArgs = changedList.collect { service ->
-                        // Matches the exact service key (e.g. auth-service) and passes the full image string
+                        // Pass the exact full image path directly to the matched service key
                         return "--set services.${service}.image=390034075362.dkr.ecr.us-east-2.amazonaws.com/staging-${service}:${IMAGE_TAG}"
                     }.join(' ')
 
@@ -225,8 +225,13 @@ pipeline {
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
                             sleep 5
-                            helm upgrade --install microservice helm/microservice -n microservices-staging-ns --create-namespace --reuse-values -f helm/microservice/values.yaml ${setArgs} || \
-                            helm upgrade --install microservice helm/microservice -n microservices-staging-ns --create-namespace -f helm/microservice/values.yaml ${setArgs}
+                            
+                            # Perform a clean install/upgrade without --reuse-values
+                            helm upgrade --install microservice helm/microservice \\
+                                -n microservices-staging-ns \\
+                                --create-namespace \\
+                                -f helm/microservice/values.yaml \\
+                                ${setArgs}
                         """
                     }
                 }
