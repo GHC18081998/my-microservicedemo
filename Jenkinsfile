@@ -152,11 +152,10 @@ pipeline {
         stage('Docker Build') {
             steps {
                 script {
-                    // Fallback to all services if CHANGED_SERVICES is empty
-                    def servicesToBuild = (env.CHANGED_SERVICES != null && env.CHANGED_SERVICES != '') ? env.CHANGED_SERVICES.split(',') : ['auth-service', 'gateway-service', 'user-service', 'admin-service', 'employee-service', 'customer-service', 'hr-service', 'task-service']
-                    
+                    def servicesToBuild = ['auth-service', 'gateway-service', 'user-service', 'admin-service', 'employee-service', 'customer-service', 'hr-service', 'task-service']
                     servicesToBuild.each { currentService ->
-                        sh "docker build -f ${currentService}/Dockerfile -t ${ECR_REGISTRY}/chandu-infra-${currentService}:${IMAGE_TAG} ."
+                        
+                        sh "docker build -f ${currentService}/Dockerfile -t ${ECR_REGISTRY}/staging-${currentService}:${IMAGE_TAG} ."
                     }
                 }
             }
@@ -165,14 +164,13 @@ pipeline {
         stage('Trivy Image Scan') {
             steps {
                 script {
-                    def servicesToScan = (env.CHANGED_SERVICES != null && env.CHANGED_SERVICES != '') ? env.CHANGED_SERVICES.split(',') : ['auth-service', 'gateway-service', 'user-service', 'admin-service', 'employee-service', 'customer-service', 'hr-service', 'task-service']
-                    
+                    def servicesToScan = ['auth-service', 'gateway-service', 'user-service', 'admin-service', 'employee-service', 'customer-service', 'hr-service', 'task-service']
                     servicesToScan.each { currentService ->
                         retry(6) {
                             sh """
                                 export TMPDIR=/var/lib/jenkins/trivy-cache-shared
                                 sleep \$((RANDOM % 30))
-                                trivy image --cache-dir /var/lib/jenkins/trivy-cache-shared --ignorefile ${WORKSPACE}/.trivyignore --skip-db-update --skip-java-db-update --severity HIGH,CRITICAL ${ECR_REGISTRY}/chandu-infra-${currentService}:${IMAGE_TAG}
+                                trivy image --cache-dir /var/lib/jenkins/trivy-cache-shared --ignorefile ${WORKSPACE}/.trivyignore --skip-db-update --skip-java-db-update --severity HIGH,CRITICAL ${ECR_REGISTRY}/staging-${currentService}:${IMAGE_TAG}
                             """
                         }
                     }
@@ -183,20 +181,21 @@ pipeline {
         stage('Push Images') {
             steps {
                 script {
-                    def servicesToPush = (env.CHANGED_SERVICES != null && env.CHANGED_SERVICES != '') ? env.CHANGED_SERVICES.split(',') : ['auth-service', 'gateway-service', 'user-service', 'admin-service', 'employee-service', 'customer-service', 'hr-service', 'task-service']
+                    def servicesToPush = ['auth-service', 'gateway-service', 'user-service', 'admin-service', 'employee-service', 'customer-service', 'hr-service', 'task-service']
                     
+                    sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
+
                     servicesToPush.each { currentService ->
                         sh """
-                            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
-                            docker push ${ECR_REGISTRY}/chandu-infra-${currentService}:${IMAGE_TAG}
+                            docker push ${ECR_REGISTRY}/staging-${currentService}:${IMAGE_TAG}
                         """
                         retry(3) {
                             withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                                 sh """
                                     sleep \$((RANDOM % 25 + 15))
                                     docker login ${NEXUS_REGISTRY} -u \$NEXUS_USER -p \$NEXUS_PASS
-                                    docker tag ${ECR_REGISTRY}/chandu-infra-${currentService}:${IMAGE_TAG} ${NEXUS_REGISTRY}/${NEXUS_REPOSITORY}/chandu-infra-${currentService}:${IMAGE_TAG}
-                                    docker push ${NEXUS_REGISTRY}/${NEXUS_REPOSITORY}/chandu-infra-${currentService}:${IMAGE_TAG}
+                                    docker tag ${ECR_REGISTRY}/staging-${currentService}:${IMAGE_TAG} ${NEX_REGISTRY}/${NEXUS_REPOSITORY}/staging-${currentService}:${IMAGE_TAG}
+                                    docker push ${NEX_REGISTRY}/${NEXUS_REPOSITORY}/staging-${currentService}:${IMAGE_TAG}
                                 """
                             }
                         }
