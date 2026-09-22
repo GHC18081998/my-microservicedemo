@@ -418,6 +418,7 @@ pipeline {
                 docker logout ${ECR_REGISTRY} >/dev/null 2>&1 || true
                 docker logout ${NEXUS_REGISTRY} >/dev/null 2>&1 || true
             '''
+            cleanWs()
         }
     }
 }
