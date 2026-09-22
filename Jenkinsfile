@@ -238,33 +238,15 @@ pipeline {
             }
         }
 
-        stage('Rollout Status') {
-            steps {
-                script {
-                    env.CHANGED_SERVICES.split(',').each { service ->
-                        // Determine target namespace dynamically (e.g., 'auth-service' -> 'auth-ns')
-                        def targetNamespace = service.replace('-service', '') + '-ns'
-                        
-                        sh """
-                            export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
-                            kubectl rollout status deployment/${service} -n ${targetNamespace} --timeout=300s
-                        """
-                    }
-                }
-            }
-        }
-
         stage('Smoke Test') {
             steps {
                 script {
-                    // Ports aligned with your values.yaml mappings
                     def ports = ['auth-service': 8081, 'gateway-service': 8080, 'user-service': 8082,
                                  'admin-service': 8083, 'employee-service': 8085, 'customer-service': 8084,
                                  'hr-service': 8086, 'task-service': 8087]
                                  
                     env.CHANGED_SERVICES.split(',').each { service ->
                         def port = ports[service]
-                        // Determine target namespace dynamically
                         def targetNamespace = service.replace('-service', '') + '-ns'
                         
                         sh """
@@ -278,6 +260,7 @@ pipeline {
                 }
             }
         }
+    }
         
     post {
         always {
