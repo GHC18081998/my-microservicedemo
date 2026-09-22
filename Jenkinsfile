@@ -242,13 +242,10 @@ pipeline {
             steps {
                 script {
                     env.CHANGED_SERVICES.split(',').each { service ->
-                        // Dynamically determine the namespace (e.g., 'auth-service' -> 'auth-ns')
-                        def targetNamespace = service.replace('-service', '') + '-ns'
-                        
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
-                            echo "Waiting for ${service} to become ready in namespace ${targetNamespace}..."
-                            kubectl rollout status deployment/${service} -n ${targetNamespace} --timeout=300s
+                            echo "Waiting for ${service} to become ready in ${K8S_NAMESPACE}..."
+                            kubectl rollout status deployment/${service} -n ${K8S_NAMESPACE} --timeout=300s
                         """
                     }
                 }
@@ -264,14 +261,13 @@ pipeline {
                                  
                     env.CHANGED_SERVICES.split(',').each { service ->
                         def port = ports[service]
-                        def targetNamespace = service.replace('-service', '') + '-ns'
                         
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
                             sleep 10
-                            kubectl run smoke-test-${service}-${BUILD_NUMBER} --rm -i --restart=Never -n ${targetNamespace} \\
+                            kubectl run smoke-test-${service}-${BUILD_NUMBER} --rm -i --restart=Never -n ${K8S_NAMESPACE} \\
                                 --image=curlimages/curl \\
-                                -- curl -sf http://${service}.${targetNamespace}.svc.cluster.local:${port}/actuator/health
+                                -- curl -sf http://${service}.${K8S_NAMESPACE}.svc.cluster.local:${port}/actuator/health
                         """
                     }
                 }
