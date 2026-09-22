@@ -20,15 +20,9 @@ spec:
     spec:
       containers:
       - name: {{ $name }}
-
-        {{- if eq $svc.registry "nexus" }}
-        image: "{{ $.Values.nexus.repository }}/{{ $name }}:{{ $svc.imageTag }}"
-        {{- else }}
-        image: "{{ $.Values.image.repository }}:{{ $svc.imageTag }}"
-        {{- end }}
-        
+        # Direct injection from Jenkins:
+        image: "{{ $svc.image }}"
         imagePullPolicy: {{ $.Values.image.pullPolicy }}
-        
         resources:
           requests:
             cpu: "{{ $svc.resources.requests.cpu }}"
@@ -59,16 +53,13 @@ spec:
             secretKeyRef:
               name: {{ $.Values.database.secretName }}
               key: password
-
         - name: SPRING_DATASOURCE_URL
           value: "jdbc:mysql://{{ $.Values.database.host }}:{{ $.Values.database.port }}/{{ $svc.dbName }}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-
         - name: SPRING_DATASOURCE_USERNAME
           valueFrom:
             secretKeyRef:
               name: {{ $.Values.database.secretName }}
               key: username
-
         - name: SPRING_DATASOURCE_PASSWORD
           valueFrom:
             secretKeyRef:
