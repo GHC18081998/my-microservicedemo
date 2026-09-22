@@ -224,7 +224,7 @@ pipeline {
                                 export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
                                 sleep \$((RANDOM % 15))
                                 helm upgrade ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} --reuse-values -f ${HELM_VALUES} \\
-                                    --set services.${helmServiceKey}.image=vasavi-infra-dev-${service} \\
+                                    --set services.${helmServiceKey}.image=staging-${service} \\
                                     --set services.${helmServiceKey}.tag=${IMAGE_TAG}
                             """
                         }
