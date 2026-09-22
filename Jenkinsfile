@@ -35,15 +35,15 @@ pipeline {
                 checkout scm
                 
                 script {
-                    // Unified list containing all 8 services
+                    // Unified list of ALL 8 services
                     def allServices = [
                         'gateway-service', 'auth-service', 'user-service', 
                         'admin-service', 'employee-service', 'customer-service', 
                         'hr-service', 'task-service'
                     ]
 
-                    // Detect which services changed in this commit
-                    def changedFiles = sh(script: "git diff --name-only HEAD~1 HEAD || echo ''", returnStdout: true).trim().split('\n')
+                    // FIXED: diff-tree works reliably even on Jenkins shallow clones
+                    def changedFiles = sh(script: "git diff-tree --no-commit-id --name-only -r HEAD || echo ''", returnStdout: true).trim().split('\n')
                     
                     def changed = allServices.findAll { service ->
                         changedFiles.any { it.startsWith(service + '/') }
@@ -118,18 +118,18 @@ pipeline {
                         parallelTasks["Process ${service}"] = {
                             def imageTag = "${service}-${BUILD_NUMBER}"
                             
-                            // Define both URI paths
+                            // Define BOTH endpoints for every service
                             def ecrUri = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${imageTag}"
                             def nexusUri = "${NEXUS_REGISTRY}/${NEXUS_REPOSITORY}/${service}:${imageTag}"
 
                             stage("${service}: Docker Build") {
-                                // Build once, but apply BOTH tags using two -t flags
+                                // Apply BOTH tags simultaneously during the build phase
                                 sh "docker build -f ${service}/Dockerfile -t ${ecrUri} -t ${nexusUri} ."
                             }
 
                             stage("${service}: Trivy Scan") {
                                 retry(3) {
-                                    // We only need to scan the ECR tag since the underlying image is identical
+                                    // Scan the local image via the ECR tag
                                     sh """
                                         export TMPDIR=/var/lib/jenkins/trivy-cache-shared
                                         trivy image --cache-dir /var/lib/jenkins/trivy-cache-shared \
@@ -143,13 +143,13 @@ pipeline {
                             }
 
                             stage("${service}: Push Image to ECR & Nexus") {
-                                // 1. Push to ECR
+                                // Push to ECR
                                 sh """
                                     aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
                                     docker push ${ecrUri}
                                 """
                                 
-                                // 2. Push to Nexus
+                                // Push to Nexus
                                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                                     sh """
                                         echo "\$NEXUS_PASS" | docker login ${NEXUS_REGISTRY} --username "\$NEXUS_USER" --password-stdin
@@ -160,14 +160,15 @@ pipeline {
 
                             stage("${service}: Helm Deploy") {
                                 if (env.ENABLE_DEPLOY == 'true') {
+                                    // Requires the Lockable Resources Jenkins Plugin
                                     lock('helm-deploy-lock') {
                                         def serviceKey = service.replace('-service', '')
+                                        // Removed --reuse-values to prevent initial installation crashes
                                         sh """
                                             helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} \
                                               --namespace ${K8S_NAMESPACE} \
                                               -f ${HELM_VALUES} \
                                               -f ${HELM_TEST_VALUES} \
-                                              --reuse-values \
                                               --set services.${serviceKey}.imageTag=${imageTag} \
                                               --atomic --wait --timeout 10m
                                         """
@@ -208,12 +209,6 @@ pipeline {
                 docker logout ${NEXUS_REGISTRY} >/dev/null 2>&1 || true
             '''
             cleanWs()
-        }
-        success {
-            echo "Pipeline succeeded! Changed services dynamically processed: ${env.CHANGED_SERVICES}"
-        }
-        failure {
-            echo "Pipeline failed. Check the parallel stage logs to identify the broken microservice."
         }
     }
 }
