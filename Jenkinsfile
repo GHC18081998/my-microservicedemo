@@ -213,31 +213,25 @@ pipeline {
         }
 
         stage('Helm Deploy') {
-            // when { expression { env.ENABLE_DEPLOY == 'true' } }
             steps {
                 script {
                     def changedList = env.CHANGED_SERVICES.split(',')
                     def setArgs = changedList.collect { service ->
-                        def helmServiceKey = service.replace('-service', '')
-                        return "--set services.${helmServiceKey}.image=staging-${service} --set services.${helmServiceKey}.tag=${IMAGE_TAG}"
+                        // Matches the exact service key (e.g. auth-service) and passes the full image string
+                        return "--set services.${service}.image=390034075362.dkr.ecr.us-east-2.amazonaws.com/staging-${service}:${IMAGE_TAG}"
                     }.join(' ')
 
                     retry(5) {
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
-                            
-                            # Automatically create the namespace if it does not exist
-                            kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                            
-                            sleep \$((RANDOM % 15))
-                            helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} --create-namespace --reuse-values -f ${HELM_VALUES} ${setArgs} || \
-                            helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} -n ${K8S_NAMESPACE} --create-namespace -f ${HELM_VALUES} ${setArgs}
+                            sleep 5
+                            helm upgrade --install microservice helm/microservice -n microservices-staging-ns --create-namespace --reuse-values -f helm/microservice/values.yaml ${setArgs} || \
+                            helm upgrade --install microservice helm/microservice -n microservices-staging-ns --create-namespace -f helm/microservice/values.yaml ${setArgs}
                         """
                     }
                 }
             }
         }
-
         stage('Rollout Status') {
             steps {
                 script {
