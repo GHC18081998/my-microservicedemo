@@ -242,9 +242,12 @@ pipeline {
             steps {
                 script {
                     env.CHANGED_SERVICES.split(',').each { service ->
+                        // Determine target namespace dynamically (e.g., 'auth-service' -> 'auth-ns')
+                        def targetNamespace = service.replace('-service', '') + '-ns'
+                        
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
-                            kubectl rollout status deployment/${service} -n ${K8S_NAMESPACE} --timeout=300s
+                            kubectl rollout status deployment/${service} -n ${targetNamespace} --timeout=300s
                         """
                     }
                 }
@@ -254,24 +257,27 @@ pipeline {
         stage('Smoke Test') {
             steps {
                 script {
+                    // Ports aligned with your values.yaml mappings
                     def ports = ['auth-service': 8081, 'gateway-service': 8080, 'user-service': 8082,
-                                 'admin-service': 8082, 'employee-service': 8083, 'customer-service': 8084,
-                                 'hr-service': 8085, 'task-service': 8089]
+                                 'admin-service': 8083, 'employee-service': 8085, 'customer-service': 8084,
+                                 'hr-service': 8086, 'task-service': 8087]
                                  
                     env.CHANGED_SERVICES.split(',').each { service ->
                         def port = ports[service]
+                        // Determine target namespace dynamically
+                        def targetNamespace = service.replace('-service', '') + '-ns'
+                        
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
                             sleep 10
-                            kubectl run smoke-test-${service}-${BUILD_NUMBER} --rm -i --restart=Never -n ${K8S_NAMESPACE} \\
+                            kubectl run smoke-test-${service}-${BUILD_NUMBER} --rm -i --restart=Never -n ${targetNamespace} \\
                                 --image=curlimages/curl \\
-                                -- curl -sf http://${service}.${K8S_NAMESPACE}.svc.cluster.local:${port}/actuator/health
+                                -- curl -sf http://${service}.${targetNamespace}.svc.cluster.local:${port}/actuator/health
                         """
                     }
                 }
             }
         }
-    }
         
     post {
         always {
