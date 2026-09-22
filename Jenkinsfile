@@ -8,7 +8,7 @@ pipeline {
         ECR_REGISTRY     = '390034075362.dkr.ecr.us-east-2.amazonaws.com'
         
         // Nexus Docker Registry
-        NEXUS_REGISTRY   = '10.0.10.22:8081'
+        NEXUS_REGISTRY   = '10.0.10.22:8082'
         NEXUS_REPOSITORY = 'microservices-docker'
         
         // Kubernetes / Helm
