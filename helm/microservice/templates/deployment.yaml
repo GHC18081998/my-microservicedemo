@@ -67,13 +67,13 @@ spec:
           httpGet:
             path: /actuator/health
             port: {{ $svc.port }}
-          initialDelaySeconds: 40
+          initialDelaySeconds: 90
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /actuator/health
             port: {{ $svc.port }}
-          initialDelaySeconds: 40
+          initialDelaySeconds: 90
           periodSeconds: 10
 {{- end }}
 {{- end }}
