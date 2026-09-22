@@ -232,6 +232,7 @@ pipeline {
                                 -n microservices-staging-ns \\
                                 --create-namespace \\
                                 -f helm/microservice/values.yaml \\
+                                -f helm/microservice/values_test.yaml \\
                                 ${setArgs}
                         """
                     }
