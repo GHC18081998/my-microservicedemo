@@ -194,8 +194,8 @@ pipeline {
                                 sh """
                                     sleep \$((RANDOM % 25 + 15))
                                     docker login ${NEXUS_REGISTRY} -u \$NEXUS_USER -p \$NEXUS_PASS
-                                    docker tag ${ECR_REGISTRY}/staging-${currentService}:${IMAGE_TAG} ${NEX_REGISTRY}/${NEXUS_REPOSITORY}/staging-${currentService}:${IMAGE_TAG}
-                                    docker push ${NEX_REGISTRY}/${NEXUS_REPOSITORY}/staging-${currentService}:${IMAGE_TAG}
+                                    docker tag ${ECR_REGISTRY}/staging-${currentService}:${IMAGE_TAG} ${NEXUS_REGISTRY}/${NEXUS_REPOSITORY}/staging-${currentService}:${IMAGE_TAG}
+                                    docker push ${NEXUS_REGISTRY}/${NEXUS_REPOSITORY}/staging-${currentService}:${IMAGE_TAG}
                                 """
                             }
                         }
