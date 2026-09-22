@@ -212,13 +212,14 @@ pipeline {
             }
         }
 
-        stage('Helm Deploy') {
+       stage('Helm Deploy') {
             steps {
                 script {
                     def changedList = env.CHANGED_SERVICES.split(',')
                     def setArgs = changedList.collect { service ->
-                        // Pass the exact full image path directly to the matched service key
-                        return "--set services.${service}.image=390034075362.dkr.ecr.us-east-2.amazonaws.com/staging-${service}:${IMAGE_TAG}"
+                        // Matches 'auth-service' exactly and passes the full image URL
+                        return "--set services.${service}.image=${ECR_REGISTRY}/staging-${service}:${IMAGE_TAG} " +
+                               "--set services.${service}.enabled=true"
                     }.join(' ')
 
                     retry(5) {
@@ -226,7 +227,7 @@ pipeline {
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
                             sleep 5
                             
-                            # Perform a clean install/upgrade without --reuse-values
+                            # Clean install/upgrade without --reuse-values to flush old bad data
                             helm upgrade --install microservice helm/microservice \\
                                 -n microservices-staging-ns \\
                                 --create-namespace \\
@@ -237,6 +238,7 @@ pipeline {
                 }
             }
         }
+
         stage('Rollout Status') {
             steps {
                 script {
@@ -263,7 +265,6 @@ pipeline {
                                  
                     env.CHANGED_SERVICES.split(',').each { service ->
                         def port = ports[service]
-                        // Calculate target namespace
                         def targetNamespace = service.replace('-service', '') + '-ns'
                         
                         sh """
