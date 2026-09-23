@@ -215,24 +215,27 @@ pipeline {
        stage('Helm Deploy') {
             steps {
                 script {
-                    def changedList = env.CHANGED_SERVICES.split(',')
+                    // TEMPORARY FIX: Hardcode all services to recover the broken cluster state.
+                    // After this build passes, change this back to: def changedList = env.CHANGED_SERVICES.split(',')
+                    def changedList = ['auth-service', 'gateway-service', 'user-service', 'admin-service', 'employee-service', 'customer-service', 'hr-service', 'task-service']
+                    
                     def setArgs = changedList.collect { service ->
-                        // Matches 'auth-service' exactly and passes the full image URL
                         return "--set services.${service}.image=${ECR_REGISTRY}/staging-${service}:${IMAGE_TAG} " +
                                "--set services.${service}.enabled=true"
                     }.join(' ')
-
+        
                     retry(5) {
                         sh """
                             export KUBECONFIG=/tmp/kubeconfig-pipeline-${BUILD_NUMBER}
                             sleep 5
                             
-                            # Clean install/upgrade without --reuse-values to flush old bad data
+                            # MUST use --reuse-values so future incremental builds don't erase existing image tags
                             helm upgrade --install microservice helm/microservice \\
                                 -n microservices-staging-ns \\
                                 --create-namespace \\
                                 -f helm/microservice/values.yaml \\
                                 -f helm/microservice/values_test.yaml \\
+                                --reuse-values \\
                                 ${setArgs}
                         """
                     }
