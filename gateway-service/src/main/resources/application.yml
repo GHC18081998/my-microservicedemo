@@ -17,44 +17,39 @@ spring:
           lower-case-service-id: true
       routes:
         - id: auth-service
-          uri: ${AUTH_SERVICE_URL:http://auth-service:8081}
+          uri: ${AUTH_SERVICE_URL:http://auth-service.auth-ns.svc.cluster.local:8081}
           predicates:
             - Path=/api/auth/**, /login, /logout, /forgot-password, /reset-password, /login.css, /forget-password.css, /reset-password.css, /favicon.svg, /favicon.ico
 
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://user-service.user-ns.svc.cluster.local:8082}
+          predicates:
+            - Path=/api/users/**
+
         - id: admin-service
-          uri: ${USER_SERVICE_URL:http://user-service:8082}
+          uri: ${ADMIN_SERVICE_URL:http://admin-service.admin-ns.svc.cluster.local:8083}
           predicates:
             - Path=/admin/**, /superadmin/**, /api/admin/**
 
-        - id: employee-service
-          uri: ${USER_SERVICE_URL:http://user-service:8082}
+        - id: customer-service
+          uri: ${CUSTOMER_SERVICE_URL:http://customer-service.customer-ns.svc.cluster.local:8084}
           predicates:
-            - Path=/employee/**, /api/employee/**, /api/tasks/**
+            - Path=/api/customers/**, /customer/**
 
-        - id: manager-service
-          uri: ${USER_SERVICE_URL:http://user-service:8082}
+        - id: employee-service
+          uri: ${EMPLOYEE_SERVICE_URL:http://employee-service.employee-ns.svc.cluster.local:8085}
           predicates:
-            - Path=/manager/**, /api/manager/**
+            - Path=/employee/**, /api/employee/**
 
         - id: hr-service
-          uri: ${USER_SERVICE_URL:http://user-service:8082}
+          uri: ${HR_SERVICE_URL:http://hr-service.hr-ns.svc.cluster.local:8086}
           predicates:
             - Path=/hr/**, /api/hr/**, /api/payroll/**
 
-        - id: holiday-service
-          uri: ${USER_SERVICE_URL:http://user-service:8082}
+        - id: task-service
+          uri: ${TASK_SERVICE_URL:http://task-service.task-ns.svc.cluster.local:8087}
           predicates:
-            - Path=/holidays, /api/holidays/**
-
-        - id: notification-service
-          uri: ${USER_SERVICE_URL:http://user-service:8082}
-          predicates:
-            - Path=/api/notifications/**, /ws/**
-
-        - id: static-resources
-          uri: ${USER_SERVICE_URL:http://user-service:8082}
-          predicates:
-            - Path=/*.css, /*.js, /*.png, /*.jpg, /*.ico, /*.svg, /css/**, /js/**, /images/**
+            - Path=/api/tasks/**
 
 app:
   jwt:
